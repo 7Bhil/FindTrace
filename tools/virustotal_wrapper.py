@@ -23,10 +23,12 @@ async def scan_virustotal(target: str) -> Dict[str, Any]:
                     data = await response.json()
                     attr = data.get("data", {}).get("attributes", {})
                     return {
-                        "reputation": attr.get("reputation"),
-                        "last_analysis_stats": attr.get("last_analysis_stats"),
-                        "categories": attr.get("categories")
+                        "reputation": attr.get("reputation", 0),
+                        "last_analysis_stats": attr.get("last_analysis_stats", {}),
+                        "categories": attr.get("categories", {})
                     }
+                elif response.status == 404:
+                    return {"info": "Target not found in VirusTotal database"}
                 else:
                     return {"error": f"VirusTotal API error: {response.status}"}
     except Exception as e:

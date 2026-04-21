@@ -139,6 +139,10 @@ class InvestigationManager:
         with open(path, 'w') as f: json.dump(data, f, indent=4)
         return path
 
+    def _get_all_findings_text(self) -> str:
+        """Helper to aggregate all findings into a single string for scoring."""
+        return " ".join([json.dumps(f.data) for e in self.entities.values() for f in e.findings.values()])
+
     def export_report(self):
         results = {eid: {"type": e.entity_type, "value": e.value, "findings": {tid: f.data for tid, f in e.findings.items()}} 
                    for eid, e in self.entities.items()}

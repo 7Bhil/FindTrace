@@ -13,6 +13,7 @@ from core.config import BANNER, BINARIES
 from core.manager import InvestigationManager
 from core.checker import get_missing_dependencies
 from core.validators import is_valid_domain, detect_target_type
+from core.scoring import GlobalScoringEngine
 
 # Tools
 from tools.dns_checker import get_dns_records
@@ -38,19 +39,19 @@ async def run_batch(domain: str, export: bool, abuse: bool):
             get_whois_info(domain)
         )
         
-        manager.root.add_finding("dns", results[0], "DNS Records")
-        manager.root.add_finding("ports", results[1], "Open Ports")
-        manager.root.add_finding("web", results[2], "Web Probe")
-        manager.root.add_finding("whois", results[3], "WHOIS Info")
-        
-        progress.update(task1, advance=4)
+    manager.root.add_finding("dns", results[0], "DNS Records")
+    manager.root.add_finding("ports", results[1], "Open Ports")
+    manager.root.add_finding("web", results[2], "Web Probe")
+    manager.root.add_finding("whois", results[3], "WHOIS Info")
     
-    manager.calculate_risk()
+    # Calculate Risk (FindTrace 2.0)
+    findings_str = manager._get_all_findings_text()
+    manager.scam_score, manager.observations = GlobalScoringEngine.calculate_risk(findings_str)
     
     # Simple report display
-    console.print(Panel(f"[bold]Target:[/bold] {domain}\n[bold]Risk Score:[/bold] {manager.scam_score}/100", title="Investigation Result"))
+    console.print(Panel(f"[bold]Target:[/bold] {domain}\n[bold]Risk Score:[/bold] {manager.scam_score}/1000", title="Investigation Result"))
     for obs in manager.observations:
-        console.print(f"[warning]![/warning] {obs}")
+        console.print(f"[*] {obs}")
         
     if export:
         path = manager.export_report()

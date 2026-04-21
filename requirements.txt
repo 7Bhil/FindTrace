@@ -1,0 +1,15 @@
+rich
+click
+requests
+python-whois
+dnspython
+questionary
+aiohttp
+httpx
+shodan
+virustotal-api
+spiderfoot
+amass
+nuclei-python
+theharvester
+python-dotenv

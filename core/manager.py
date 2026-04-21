@@ -21,6 +21,9 @@ from tools.sub_discovery import discover_subdomains
 from tools.maigret_wrapper import run_maigret
 from tools.holehe_wrapper import run_holehe
 from tools.geo_ip import get_ip_geo
+from tools.shodan_wrapper import scan_shodan
+from tools.virustotal_wrapper import scan_virustotal
+from tools.abuseipdb_wrapper import check_abuseip
 
 class InvestigationManager:
     """Universal OSINT orchestrator."""
@@ -87,6 +90,18 @@ class InvestigationManager:
             elif tool_id == "holehe_check":
                 res = await run_holehe(entity.value)
                 entity.add_finding("holehe", res, "Email Presence Detection")
+
+            elif tool_id == "shodan":
+                res = await scan_shodan(entity.value)
+                entity.add_finding("shodan", res, "Shodan IP Intelligence")
+
+            elif tool_id == "virustotal":
+                res = await scan_virustotal(entity.value)
+                entity.add_finding("virustotal", res, "VirusTotal Reputation")
+
+            elif tool_id == "abuseip":
+                res = await check_abuseip(entity.value)
+                entity.add_finding("abuseip", res, "AbuseIPDB Reputation")
 
         # Calculate Global Risk Score (0-1000)
         all_findings = " ".join([json.dumps(f.data) for e in self.entities.values() for f in e.findings.values()])

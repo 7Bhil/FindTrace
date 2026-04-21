@@ -38,12 +38,16 @@ class InvestigationUI:
                 questionary.Choice(f"DNS Scan", "dns_scan"),
                 questionary.Choice(f"Web Probe", "web_probe"),
                 questionary.Choice(f"WHOIS Lookup", "whois"),
-                questionary.Choice(f"Subdomain Discovery", "subdomains")
+                questionary.Choice(f"Subdomain Discovery", "subdomains"),
+                questionary.Choice(f"VirusTotal Check (API)", "virustotal")
             ]
         elif etype == "ip":
             choices += [
                 questionary.Choice(f"Port Scan", "port_scan"),
-                questionary.Choice(f"WHOIS Lookup", "whois")
+                questionary.Choice(f"WHOIS Lookup", "whois"),
+                questionary.Choice(f"Shodan Intelligence (API)", "shodan"),
+                questionary.Choice(f"AbuseIPDB Check (API)", "abuseip"),
+                questionary.Choice(f"VirusTotal Check (API)", "virustotal")
             ]
         elif etype == "username":
             choices += [

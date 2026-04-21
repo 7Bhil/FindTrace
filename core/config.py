@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv() # Load variables from .env if it exists
 from typing import Dict
 
 # Global Timeouts
@@ -55,6 +58,12 @@ THREAT_PATTERNS = {
     "445/tcp": {"risk": 50, "region": "global", "desc": "Exposed SMB (Lateral movement risk)"},
     "5900/tcp": {"risk": 40, "region": "global", "desc": "Exposed VNC (Remote access)"},
 }
+
+# API Keys (Loaded from .env)
+SHODAN_API_KEY = os.getenv("SHODAN_API_KEY")
+VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY")
+URLSCAN_API_KEY = os.getenv("URLSCAN_API_KEY")
 
 # Tool Binaries
 BINARIES = ["dig", "nmap", "httpx", "whois", "subfinder"]

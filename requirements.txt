@@ -8,8 +8,4 @@ aiohttp
 httpx
 shodan
 virustotal-api
-spiderfoot
-amass
-nuclei-python
-theharvester
 python-dotenv

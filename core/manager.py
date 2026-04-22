@@ -103,6 +103,11 @@ class InvestigationManager:
                 entity.add_finding("web", res, "Web Services")
                 if res.get('techs'):
                     console.print(f"[success][+] Technologies detected: {', '.join(res['techs'])}[/success]")
+            
+            elif tool_id == "whois":
+                res = await get_whois_info(entity.value)
+                entity.add_finding("whois", res, "Whois Data")
+                console.print(f"[success][+] Information WHOIS récupérée pour {entity.value}.[/success]")
                 
             elif tool_id == "subdomains":
                 res = await discover_subdomains(entity.value)

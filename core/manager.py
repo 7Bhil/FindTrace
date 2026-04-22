@@ -4,8 +4,8 @@ import os
 import questionary
 from typing import Dict, List, Optional, Any
 from rich.panel import Panel
-
-from core.models import Entity, Finding
+from rich.table import Table
+from core.models import Entity
 from core.config import SESSIONS_DIR, REPORTS_DIR, MAX_SCORE
 from core.validators import sanitize_filename, detect_target_type
 from core.scoring import GlobalScoringEngine
@@ -34,8 +34,31 @@ class InvestigationManager:
         self.current_entity = self.root
         self.scam_score = 0
         self.observations: List[str] = []
+        self.discovered_ips: Dict[str, Dict[str, Any]] = {} # Track all unique IPs found
         self._lock = asyncio.Lock()
         self.running = True
+
+        # If starting with an IP, register it
+        if target_type == "ip":
+            asyncio.create_task(self._register_ip(target, "Root Target"))
+
+    async def _register_ip(self, ip: str, source: str):
+        """Internal helper to log a discovered IP."""
+        if ip not in self.discovered_ips:
+            self.discovered_ips[ip] = {
+                "source": source,
+                "geo": "Searching...",
+                "asn": "Searching...",
+                "ptr": "Searching..."
+            }
+            # Auto-enrich in background
+            geo = await get_ip_geo(ip)
+            if geo:
+                self.discovered_ips[ip].update({
+                    "geo": f"{geo.get('country', '??')} ({geo.get('city', '??')})",
+                    "asn": geo.get("org", "Unknown"),
+                    "ptr": geo.get("hostname", "None")
+                })
 
     async def add_entity(self, value: str, entity_type: str, parent_id: Optional[str] = None) -> Entity:
         async with self._lock:
@@ -64,7 +87,9 @@ class InvestigationManager:
             if tool_id == "dns_scan":
                 res = await get_dns_records(entity.value)
                 entity.add_finding("dns", res, "DNS Records")
-                for ip in res.get('A', []): await self.add_entity(ip, "ip", f"{entity.entity_type}:{entity.value}")
+                for ip in res.get('A', []): 
+                    await self.add_entity(ip, "ip", f"{entity.entity_type}:{entity.value}")
+                    await self._register_ip(ip, f"DNS A-Record for {entity.value}")
             
             elif tool_id == "port_scan":
                 res = await scan_ports(entity.value)
@@ -120,6 +145,10 @@ class InvestigationManager:
             elif choice == "switch":
                 switch_choices = [questionary.Choice(f"{e.entity_type}: {e.value}", e) for e in self.entities.values()]
                 self.current_entity = await questionary.select("Select entity:", choices=switch_choices).ask_async()
+            elif choice == "summary":
+                summary_table = InvestigationUI.render_ip_summary(self.discovered_ips)
+                console.print(summary_table)
+                await questionary.press_any_key_to_continue().ask_async()
             else:
                 await self.run_tool(choice, self.current_entity)
                 await questionary.press_any_key_to_continue().ask_async()

@@ -14,6 +14,26 @@ class InvestigationUI:
         return tree
 
     @staticmethod
+    def render_ip_summary(ips: dict) -> Table:
+        """Render a consolidated table of all discovered machine IPs."""
+        table = Table(title="Machine Infrastructure Summary", show_header=True, header_style="bold magenta")
+        table.add_column("IP Address", style="cyan")
+        table.add_column("Source", style="green")
+        table.add_column("Location (Geo)", style="yellow")
+        table.add_column("Organization (ASN)", style="blue")
+        table.add_column("Hostname (PTR)", style="dim")
+
+        for ip, data in ips.items():
+            table.add_row(
+                ip,
+                data.get("source", "Unknown"),
+                data.get("geo", "N/A"),
+                data.get("asn", "N/A"),
+                data.get("ptr", "N/A")
+            )
+        return table
+
+    @staticmethod
     def _build_tree(entity: Entity, node):
         loc = ""
         if "geo" in entity.findings:
@@ -30,7 +50,10 @@ class InvestigationUI:
 
     @staticmethod
     async def select_action(current_entity: Entity):
-        choices = []
+        choices = [
+            questionary.Choice("📊 Machine Infrastructure Summary", "summary"),
+            questionary.Separator()
+        ]
         etype = current_entity.entity_type
         
         if etype == "domain":

@@ -50,41 +50,80 @@ class InvestigationUI:
             InvestigationUI._build_tree(child, sub_node)
 
     @staticmethod
+    def render_guide(target_type: str) -> Panel:
+        """Provide clear, actionable instructions for beginners based on target type."""
+        guide_text = ""
+        if target_type == "domain":
+            guide_text = (
+                "[bold green]OBJECTIF :[/bold green] Identifier l'infrastructure et les machines derrière ce domaine.\n"
+                "[bold cyan]Étape 1 :[/bold cyan] Lance un [bold]DNS Scan[/bold] pour trouver les adresses IP.\n"
+                "[bold cyan]Étape 2 :[/bold cyan] Utilise [bold]Subdomain Discovery[/bold] pour voir l'étendue de l'infrastructure.\n"
+                "[bold cyan]Étape 3 :[/bold cyan] Consulte le [bold]Machine Summary[/bold] pour voir tout ce qui a été trouvé."
+            )
+        elif target_type == "ip":
+            guide_text = (
+                "[bold green]OBJECTIF :[/bold green] Caractériser cette machine et son niveau de menace.\n"
+                "[bold cyan]Étape 1 :[/bold cyan] Lance un [bold]Port Scan[/bold] pour voir quels services tournent.\n"
+                "[bold cyan]Étape 2 :[/bold cyan] Utilise [bold]Shodan[/bold] ou [bold]AbuseIPDB[/bold] pour l'intelligence mondiale.\n"
+                "[bold cyan]Étape 3 :[/bold cyan] Vérifie la réputation sur [bold]VirusTotal[/bold]."
+            )
+        else:
+            guide_text = "[bold yellow]Action recommandée :[/bold yellow] Explore les options ci-dessous pour collecter tes premières preuves."
+
+        return Panel(guide_text, title="📖 GUIDE DÉBUTANT - QUE FAIRE MAINTENANT ?", border_style="green")
+
+    @staticmethod
     async def select_action(current_entity: Entity):
+        if not current_entity:
+            return "exit"
+
         choices = [
-            questionary.Choice("📊 Machine Infrastructure Summary", "summary"),
-            questionary.Separator()
+            questionary.Choice(
+                "📊 Machine Infrastructure Summary", 
+                "summary",
+                description="Affiche un tableau complet de toutes les machines et IP découvertes jusqu'ici."
+            ),
+            questionary.Choice(
+                "🎯 Switch Current Target", 
+                "switch",
+                description="Change de cible pour approfondir l'enquête sur une IP ou un sous-domaine découvert."
+            ),
+            questionary.Separator(),
         ]
         etype = current_entity.entity_type
         
         if etype == "domain":
             choices += [
-                questionary.Choice(f"DNS Scan", "dns_scan"),
-                questionary.Choice(f"Web Probe", "web_probe"),
-                questionary.Choice(f"WHOIS Lookup", "whois"),
-                questionary.Choice(f"Subdomain Discovery", "subdomains"),
-                questionary.Choice(f"VirusTotal Check (API)", "virustotal")
+                questionary.Choice("DNS Scan", "dns_scan", description="Trouve les IP et les enregistrements DNS (A, MX, TXT) du domaine."),
+                questionary.Choice("Web Probe", "web_probe", description="Analyse les technologies web (ThinkPHP, CMS) et les en-têtes HTTP."),
+                questionary.Choice("WHOIS Lookup", "whois", description="Récupère les informations sur le propriétaire du domaine."),
+                questionary.Choice("Subdomain Discovery", "subdomains", description="Cherche tous les sous-domaines cachés pour cartographier l'infrastructure."),
+                questionary.Choice("VirusTotal Check (API)", "virustotal", description="Vérifie la réputation de sécurité mondiale du domaine.")
             ]
         elif etype == "ip":
             choices += [
-                questionary.Choice(f"Port Scan", "port_scan"),
-                questionary.Choice(f"WHOIS Lookup", "whois"),
-                questionary.Choice(f"Shodan Intelligence (API)", "shodan"),
-                questionary.Choice(f"AbuseIPDB Check (API)", "abuseip"),
-                questionary.Choice(f"VirusTotal Check (API)", "virustotal")
+                questionary.Choice("Port Scan", "port_scan", description="Détecte les ports ouverts et les services actifs sur la machine."),
+                questionary.Choice("WHOIS Lookup", "whois", description="Trouve à qui appartient cette plage d'IP."),
+                questionary.Choice("Shodan Intelligence (API)", "shodan", description="Interroge Shodan pour voir les vulnérabilités et services exposés."),
+                questionary.Choice("AbuseIPDB Check (API)", "abuseip", description="Vérifie si cette IP a été signalée pour des activités malveillantes."),
+                questionary.Choice("VirusTotal Check (API)", "virustotal", description="Vérifie si cette IP est connue comme malveillante sur VT.")
             ]
         elif etype == "username":
             choices += [
-                questionary.Choice(f"Maigret Username Search", "maigret_search")
+                questionary.Choice("Maigret Social Search", "maigret_search", description="Traque ce pseudonyme sur des centaines de réseaux sociaux.")
             ]
         elif etype == "email":
             choices += [
-                questionary.Choice(f"Holehe Email Presence", "holehe_check")
+                questionary.Choice("Holehe Presence Detection", "holehe_check", description="Vérifie sur quels sites cet email est utilisé pour créer un profil.")
             ]
 
         choices += [
             questionary.Separator(),
-            questionary.Choice("Switch Entity", "switch"),
-            questionary.Choice("Generate Report & Exit", "exit")
+            questionary.Choice("🚪 Exit Investigation", "exit", description="Termine l'enquête et revient au menu principal.")
         ]
-        return await questionary.select(f"Action on {current_entity.value} ({etype}):", choices=choices).ask_async()
+        
+        return await questionary.select(
+            f"Action sur {current_entity.value} ({etype}) :", 
+            choices=choices,
+            instruction="Utilise les flèches pour choisir et 'Entrée' pour valider."
+        ).ask_async()

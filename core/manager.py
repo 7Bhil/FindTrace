@@ -134,17 +134,26 @@ class InvestigationManager:
 
     async def interactive_loop(self):
         while self.running:
+            if not self.current_entity:
+                self.current_entity = self.root
+
             console.clear()
+            # Show guidance for beginners
+            guide = InvestigationUI.render_guide(self.current_entity.entity_type)
+            console.print(guide)
+            
             tree = InvestigationUI.render_tree(self.target, self.root, self.scam_score)
-            console.print(Panel(tree, title="FindTrace V4 - Decoupled Architecture"))
+            console.print(Panel(tree, title=f"FindTrace 2.0 - Active Investigation: {self.target}"))
             
             choice = await InvestigationUI.select_action(self.current_entity)
             
-            if choice == "exit":
+            if not choice or choice == "exit":
                 self.running = False
             elif choice == "switch":
-                switch_choices = [questionary.Choice(f"{e.entity_type}: {e.value}", e) for e in self.entities.values()]
-                self.current_entity = await questionary.select("Select entity:", choices=switch_choices).ask_async()
+                switch_choices = [questionary.Choice(f"{e.entity_type.upper()}: {e.value}", e) for e in self.entities.values()]
+                new_entity = await questionary.select("Switch to which target?", choices=switch_choices).ask_async()
+                if new_entity:
+                    self.current_entity = new_entity
             elif choice == "summary":
                 summary_table = InvestigationUI.render_ip_summary(self.discovered_ips)
                 console.print(summary_table)

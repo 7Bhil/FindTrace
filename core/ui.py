@@ -2,6 +2,7 @@ import questionary
 from rich.console import Console
 from rich.tree import Tree
 from rich.panel import Panel
+from rich.table import Table
 from core.models import Entity
 
 console = Console()

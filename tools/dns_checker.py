@@ -14,15 +14,21 @@ async def get_dns_records(domain: str) -> Dict[str, List[str]]:
         try:
             # -t: type, +short: only answer
             proc = await asyncio.create_subprocess_exec(
-                'dig', t, domain, '+short',
+                'dig', t, domain, '+short', '-4', # Force IPv4 for simplicity
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, _ = await proc.communicate()
-            output = stdout.decode().strip()
-            if output:
-                records[t] = [line.strip('"') for line in output.split('\n') if line]
-            else:
+            # Add a timeout to prevent hanging
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+                output = stdout.decode().strip()
+                if output:
+                    records[t] = [line.strip('" ') for line in output.split('\n') if line]
+                else:
+                    records[t] = []
+            except asyncio.TimeoutError:
+                if proc.returncode is None:
+                    proc.kill()
                 records[t] = []
         except Exception:
             records[t] = []

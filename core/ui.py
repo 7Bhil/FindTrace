@@ -35,18 +35,24 @@ class InvestigationUI:
         return table
 
     @staticmethod
-    def _build_tree(entity: Entity, node):
+    def _build_tree(entity: Entity, node, is_current: bool = False):
         loc = ""
         if "geo" in entity.findings:
             geo = entity.findings["geo"].data
             loc = f" [{geo.get('countryCode', '??')}]"
             
-        label = f"[cyan]{entity.entity_type.upper()}{loc}:[/cyan] {entity.value}"
+        indicator = "👉 " if is_current else ""
+        label = f"{indicator}[cyan]{entity.entity_type.upper()}{loc}:[/cyan] [bold]{entity.value}[/bold]"
+        
         if entity.findings:
             label += f" [yellow]({len(entity.findings)} findings)[/yellow]"
         
         sub_node = node.add(label)
-        for child in entity.children:
+        # Sort children: IPs first, then Domains
+        sorted_children = sorted(entity.children, key=lambda x: x.entity_type, reverse=True)
+        for child in sorted_children:
+            # Note: We don't mark children as 'current' at this level to avoid confusion
+            # Only the direct current entity in the root loop should be marked if possible
             InvestigationUI._build_tree(child, sub_node)
 
     @staticmethod

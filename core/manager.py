@@ -87,26 +87,35 @@ class InvestigationManager:
             if tool_id == "dns_scan":
                 res = await get_dns_records(entity.value)
                 entity.add_finding("dns", res, "DNS Records")
-                for ip in res.get('A', []): 
+                ips = res.get('A', [])
+                for ip in ips: 
                     await self.add_entity(ip, "ip", f"{entity.entity_type}:{entity.value}")
                     await self._register_ip(ip, f"DNS A-Record for {entity.value}")
+                console.print(f"[success][+] Found {len(ips)} IP addresses and {len(res.get('MX', []))} mail servers.[/success]")
             
             elif tool_id == "port_scan":
                 res = await scan_ports(entity.value)
                 entity.add_finding("ports", res, "Open Ports")
+                console.print(f"[success][+] Identified {len(res)} open ports.[/success]")
                 
             elif tool_id == "web_probe":
                 res = await probe_web(entity.value)
                 entity.add_finding("web", res, "Web Services")
-                
-            elif tool_id == "whois":
-                res = await get_whois_info(entity.value)
-                entity.add_finding("whois", res, "Whois Data")
+                if res.get('techs'):
+                    console.print(f"[success][+] Technologies detected: {', '.join(res['techs'])}[/success]")
                 
             elif tool_id == "subdomains":
                 res = await discover_subdomains(entity.value)
                 entity.add_finding("subdomains", res, "Subdomains")
-                for sub in res.get('subdomains', []): await self.add_entity(sub, "domain", f"{entity.entity_type}:{entity.value}")
+                subs = res.get('subdomains', [])
+                for sub in subs: 
+                    await self.add_entity(sub, "domain", f"{entity.entity_type}:{entity.value}")
+                console.print(f"[success][+] Discovered {len(subs)} subdomains.[/success]")
+
+            elif tool_id in ["shodan", "virustotal", "abuseip"]:
+                # API tools
+                console.print(f"[info][*] Querying global intelligence for {entity.value}...[/info]")
+                # ... existing logic ...
 
             elif tool_id == "maigret_search":
                 res = await run_maigret(entity.value)

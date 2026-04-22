@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import aiohttp
 import questionary
 from typing import Dict, List, Optional, Any
 from rich.panel import Panel
@@ -37,13 +38,23 @@ class InvestigationManager:
         self.discovered_ips: Dict[str, Dict[str, Any]] = {} # Track all unique IPs found
         self._lock = asyncio.Lock()
         self.running = True
+        self.session = None # Persistent session
 
         # If starting with an IP, register it
         if target_type == "ip":
             asyncio.create_task(self._register_ip(target, "Root Target"))
 
+    async def _get_session(self):
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
+        return self.session
+
+    async def cleanup(self):
+        if self.session and not self.session.closed:
+            await self.session.close()
+
     async def _register_ip(self, ip: str, source: str):
-        """Internal helper to log a discovered IP."""
+        """Internal helper to log and enrich a discovered IP."""
         if ip not in self.discovered_ips:
             self.discovered_ips[ip] = {
                 "source": source,
@@ -51,14 +62,21 @@ class InvestigationManager:
                 "asn": "Searching...",
                 "ptr": "Searching..."
             }
-            # Auto-enrich in background
-            geo = await get_ip_geo(ip)
+        
+        data = self.discovered_ips[ip]
+        if data["geo"] == "Searching...":
+            session = await self._get_session()
+            geo = await get_ip_geo(ip, session)
             if geo:
-                self.discovered_ips[ip].update({
+                data.update({
                     "geo": f"{geo.get('country', '??')} ({geo.get('city', '??')})",
                     "asn": geo.get("org", "Unknown"),
                     "ptr": geo.get("hostname", "None")
                 })
+                # If an entity exists for this IP, add the geo finding to it
+                eid = f"ip:{ip}"
+                if eid in self.entities:
+                    self.entities[eid].add_finding("geo", geo, "Geographic Location")
 
     async def add_entity(self, value: str, entity_type: str, parent_id: Optional[str] = None) -> Entity:
         async with self._lock:
@@ -68,12 +86,6 @@ class InvestigationManager:
             
             entity = self.entities[eid]
             
-            # Auto-enrich IP with Geo data
-            if entity_type == "ip" and "geo" not in entity.findings:
-                geo_data = await get_ip_geo(value)
-                if geo_data:
-                    entity.add_finding("geo", geo_data, "Geographic Location")
-
             if parent_id and parent_id in self.entities:
                 parent = self.entities[parent_id]
                 if entity not in parent.children:
@@ -88,9 +100,16 @@ class InvestigationManager:
                 res = await get_dns_records(entity.value)
                 entity.add_finding("dns", res, "DNS Records")
                 ips = res.get('A', [])
-                for ip in ips: 
-                    await self.add_entity(ip, "ip", f"{entity.entity_type}:{entity.value}")
-                    await self._register_ip(ip, f"DNS A-Record for {entity.value}")
+                
+                if ips:
+                    console.print(f"[info][*] Enriching {len(ips)} discovered IPs...[/info]")
+                    # Parallel registration and enrichment
+                    tasks = []
+                    for ip in ips:
+                        tasks.append(self.add_entity(ip, "ip", f"{entity.entity_type}:{entity.value}"))
+                        tasks.append(self._register_ip(ip, f"DNS A-Record for {entity.value}"))
+                    await asyncio.gather(*tasks)
+
                 console.print(f"[success][+] Found {len(ips)} IP addresses and {len(res.get('MX', []))} mail servers.[/success]")
             
             elif tool_id == "port_scan":
@@ -113,8 +132,9 @@ class InvestigationManager:
                 res = await discover_subdomains(entity.value)
                 entity.add_finding("subdomains", res, "Subdomains")
                 subs = res.get('subdomains', [])
-                for sub in subs: 
-                    await self.add_entity(sub, "domain", f"{entity.entity_type}:{entity.value}")
+                if subs:
+                    console.print(f"[info][*] Mapping {len(subs)} subdomains...[/info]")
+                    await asyncio.gather(*[self.add_entity(sub, "domain", f"{entity.entity_type}:{entity.value}") for sub in subs])
                 console.print(f"[success][+] Discovered {len(subs)} subdomains.[/success]")
 
             elif tool_id in ["shodan", "virustotal", "abuseip"]:
@@ -147,6 +167,10 @@ class InvestigationManager:
         self.scam_score, self.observations = GlobalScoringEngine.calculate_risk(all_findings)
 
     async def interactive_loop(self):
+        # Auto-register target IP if applicable
+        if self.root.entity_type == "ip":
+            await self._register_ip(self.root.value, "Root Target")
+
         while self.running:
             if not self.current_entity:
                 self.current_entity = self.root
@@ -175,6 +199,8 @@ class InvestigationManager:
             else:
                 await self.run_tool(choice, self.current_entity)
                 await questionary.press_any_key_to_continue().ask_async()
+        
+        await self.cleanup()
 
     def save_session(self):
         def entity_to_dict(e: Entity):

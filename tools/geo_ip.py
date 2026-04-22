@@ -1,20 +1,21 @@
 import aiohttp
 import asyncio
+import sys
 from typing import Dict, Any
 
-async def get_ip_geo(ip: str) -> Dict[str, Any]:
+async def get_ip_geo(ip: str, session: aiohttp.ClientSession = None) -> Dict[str, Any]:
     """
     Get geographic information for an IP address asynchronously.
-    Uses ip-api.com (Free API).
     """
-    # Simple validation
-    if not ip or ":" in ip: # Skip IPv6 for now or handle separately
+    if not ip or ":" in ip:
         return {}
 
     url = f"http://ip-api.com/json/{ip}"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=5) as response:
+    
+    # Internal logic to handle the request
+    async def fetch(s: aiohttp.ClientSession):
+        try:
+            async with s.get(url, timeout=5) as response:
                 if response.status == 200:
                     data = await response.json()
                     if data.get("status") == "success":
@@ -23,12 +24,19 @@ async def get_ip_geo(ip: str) -> Dict[str, Any]:
                             "countryCode": data.get("countryCode"),
                             "city": data.get("city"),
                             "isp": data.get("isp"),
-                            "org": data.get("org")
+                            "org": data.get("org"),
+                            "hostname": data.get("as", "N/A")
                         }
-    except Exception:
-        pass # Silently fail for enrichment
-    return {}
+        except Exception:
+            pass
+        return {}
+
+    if session:
+        return await fetch(session)
+    
+    async with aiohttp.ClientSession() as new_session:
+        return await fetch(new_session)
 
 if __name__ == "__main__":
-    if len(asyncio.sys.argv) > 1:
-        print(asyncio.run(get_ip_geo(asyncio.sys.argv[1])))
+    if len(sys.argv) > 1:
+        print(asyncio.run(get_ip_geo(sys.argv[1])))
